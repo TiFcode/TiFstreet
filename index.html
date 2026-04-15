@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>TiFstreet</title>
+  <meta name="theme-color" content="#87ceeb" />
+  <style>
+    :root {
+      --ui-bg: rgba(12, 18, 28, 0.78);
+      --ui-border: rgba(255, 255, 255, 0.14);
+      --ui-text: #eef6ff;
+      --accent: #67d6ff;
+      --good: #6cf59c;
+      --warn: #ffd76c;
+      --bad: #ff7272;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0e1622;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: linear-gradient(#87ceeb 0%, #d7f1ff 44%, #586d56 44.5%, #384b38 100%);
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .topbar {
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top));
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .panel {
+      background: var(--ui-bg);
+      color: var(--ui-text);
+      border: 1px solid var(--ui-border);
+      border-radius: 18px;
+      padding: 10px 14px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 10px 26px rgba(0,0,0,0.25);
+    }
+
+    .panel h1 {
+      font-size: 18px;
+      margin-bottom: 4px;
+      letter-spacing: 0.02em;
+    }
+
+    .panel p, .stats {
+      font-size: 13px;
+      opacity: 0.92;
+      line-height: 1.35;
+    }
+
+    .stats strong { color: #fff; }
+    .statusLine { margin-top: 4px; font-weight: 700; }
+    .statusLine.good { color: var(--good); }
+    .statusLine.warn { color: var(--warn); }
+    .statusLine.bad { color: var(--bad); }
+
+    .controls {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: max(12px, env(safe-area-inset-bottom));
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      padding: 0 12px;
+      pointer-events: none;
+    }
+
+    .cluster {
+      pointer-events: auto;
+      display: flex;
+      align-items: end;
+      gap: 12px;
+    }
+
+    .joystickWrap {
+      width: min(34vw, 180px);
+      height: min(34vw, 180px);
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.12), rgba(255,255,255,0.03));
+      border: 2px solid rgba(255,255,255,0.13);
+      position: relative;
+      box-shadow: inset 0 12px 22px rgba(255,255,255,0.05), 0 10px 24px rgba(0,0,0,0.25);
+    }
+
+    .joystickBase {
+      position: absolute;
+      inset: 14%;
+      border-radius: 50%;
+      border: 1px dashed rgba(255,255,255,0.18);
+    }
+
+    .joystickKnob {
+      position: absolute;
+      width: 34%;
+      height: 34%;
+      left: 33%;
+      top: 33%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #8de8ff, #3487ff 65%, #1c3458 100%);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+    }
+
+    .pedals {
+      display: flex;
+      gap: 12px;
+    }
+
+    .pedal {
+      width: min(18vw, 90px);
+      height: min(32vw, 170px);
+      border: 0;
+      border-radius: 24px;
+      color: white;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      font-size: 15px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.04));
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: 0 14px 28px rgba(0,0,0,0.25);
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 10px;
+    }
+
+    .pedal.accel { outline: 2px solid rgba(87, 255, 153, 0.18); }
+    .pedal.brake { outline: 2px solid rgba(255, 120, 120, 0.18); }
+    .pedal.active {
+      transform: translateY(4px) scale(0.98);
+      filter: brightness(1.18);
+    }
+
+    .flash {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 70, 70, 0.18);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .flash.show { opacity: 1; }
+
+    @media (max-width: 700px) {
+      .panel h1 { font-size: 16px; }
+      .panel p, .stats { font-size: 12px; }
+      .topbar { flex-direction: column; align-items: stretch; }
+      .topbar .panel:last-child { align-self: flex-end; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div class="hud">
+    <div class="topbar">
+      <div class="panel">
+        <h1>🚗 TiFstreet</h1>
+        <p>Slow city driving. Respect the semaphores. Touch joystick left, pedals right.</p>
+      </div>
+      <div class="panel stats">
+        <div>Speed: <strong id="speed">0.0</strong></div>
+        <div>Light ahead: <strong id="lightAhead">—</strong></div>
+        <div>Infractions: <strong id="infractions">0</strong></div>
+        <div class="statusLine good" id="statusLine">Easy does it.</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="cluster">
+        <div class="joystickWrap" id="joystick">
+          <div class="joystickBase"></div>
+          <div class="joystickKnob" id="joystickKnob"></div>
+        </div>
+      </div>
+
+      <div class="cluster pedals">
+        <button class="pedal brake" id="brake">BRAKE</button>
+        <button class="pedal accel" id="accel">GO</button>
+      </div>
+    </div>
+
+    <div class="flash" id="flash"></div>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+      const speedEl = document.getElementById('speed');
+      const lightAheadEl = document.getElementById('lightAhead');
+      const infractionsEl = document.getElementById('infractions');
+      const statusLineEl = document.getElementById('statusLine');
+      const flashEl = document.getElementById('flash');
+      const joystick = document.getElementById('joystick');
+      const joystickKnob = document.getElementById('joystickKnob');
+      const accelBtn = document.getElementById('accel');
+      const brakeBtn = document.getElementById('brake');
+
+      let w = 0;
+      let h = 0;
+      let horizonY = 0;
+      let roadBottomWidth = 0;
+      let roadTopWidth = 0;
+
+      const state = {
+        carX: 0,
+        speed: 0,
+        steer: 0,
+        throttle: 0,
+        brake: 0,
+        distance: 0,
+        infractions: 0,
+        currentLightText: '—',
+        message: 'Easy does it.',
+        messageClass: 'good',
+        flashTimer: 0,
+      };
+
+      const trafficLights = [];
+      const LIGHT_GAP = 90;
+      const BUILDING_COLORS = ['#cf6a59', '#e7b95e', '#7bb6e8', '#8dcf88', '#9d86d7', '#f2a3d3'];
+      const joystickState = { active: false, x: 0, y: 0, pointerId: null };
+      const pedalState = { accel: false, brake: false };
+
+      function resize() {
+        w = window.innerWidth;
+        h = window.innerHeight;
+        canvas.width = w * devicePixelRatio;
+        canvas.height = h * devicePixelRatio;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        horizonY = h * 0.32;
+        roadBottomWidth = Math.min(w * 0.82, 520);
+        roadTopWidth = Math.min(w * 0.10, 72);
+      }
+
+      function ensureLights() {
+        while (trafficLights.length < 14) {
+          const index = trafficLights.length;
+          trafficLights.push({
+            z: 120 + index * LIGHT_GAP,
+            sideRoadWidth: 18 + (index % 3) * 4,
+            offsetX: ((index % 4) - 1.5) * 0.02,
+            cycle: ['green', 'yellow', 'red'],
+            phaseOffset: index * 2.7,
+            penalizedAtPass: false,
+          });
+        }
+      }
+
+      function updateTrafficLights(time) {
+        for (const light of trafficLights) {
+          const t = (time * 0.001 + light.phaseOffset) % 12;
+          if (t < 5) light.state = 'green';
+          else if (t < 7) light.state = 'yellow';
+          else light.state = 'red';
+        }
+      }
+
+      function project(worldX, worldZ) {
+        const relativeZ = worldZ - state.distance;
+        if (relativeZ <= 1) return null;
+        const depth = 1 / (relativeZ * 0.018);
+        const roadCenter = w * 0.5 + state.carX * -140 * depth;
+        const screenY = horizonY + (h - horizonY) * (1 - 1 / (1 + relativeZ * 0.03));
+        const roadWidth = roadTopWidth + (roadBottomWidth - roadTopWidth) * ((screenY - horizonY) / (h - horizonY));
+        const screenX = roadCenter + worldX * roadWidth * 0.5;
+        return { x: screenX, y: screenY, scale: depth * 2.4, roadWidth, relativeZ };
+      }
+
+      function roadCenterShiftAt(z) {
+        const wave = Math.sin((z + 40) * 0.018) * 0.18 + Math.sin((z + 120) * 0.006) * 0.10;
+        return wave;
+      }
+
+      function drawBackground() {
+        ctx.clearRect(0, 0, w, h);
+
+        const sky = ctx.createLinearGradient(0, 0, 0, horizonY);
+        sky.addColorStop(0, '#79c9ff');
+        sky.addColorStop(0.6, '#d8f0ff');
+        sky.addColorStop(1, '#eff9ff');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, w, horizonY + 2);
+
+        ctx.fillStyle = '#4c6b45';
+        ctx.fillRect(0, horizonY, w, h - horizonY);
+
+        for (let i = 0; i < 10; i++) {
+          const mx = ((i * 0.14 + 0.08) % 1) * w;
+          const mh = 28 + (i % 4) * 18;
+          ctx.fillStyle = i % 2 ? '#9bb8c8' : '#adc6d4';
+          ctx.beginPath();
+          ctx.moveTo(mx - 80, horizonY + 20);
+          ctx.lineTo(mx, horizonY - mh);
+          ctx.lineTo(mx + 110, horizonY + 20);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      function drawRoadAndCity() {
+        const step = 4;
+        const segments = [];
+        for (let z = 4; z <= 210; z += step) {
+          const p = project(roadCenterShiftAt(z), z);
+          if (p) segments.push({ z, ...p });
+        }
+        if (segments.length < 2) return;
+
+        for (let i = segments.length - 2; i >= 0; i--) {
+          const a = segments[i];
+          const b = segments[i + 1];
+          const shoulderA = a.roadWidth * 0.62;
+          const shoulderB = b.roadWidth * 0.62;
+
+          ctx.fillStyle = i % 2 ? '#435a3f' : '#3f533a';
+          ctx.beginPath();
+          ctx.moveTo(a.x - shoulderA - 40, a.y);
+          ctx.lineTo(a.x + shoulderA + 40, a.y);
+          ctx.lineTo(b.x + shoulderB + 40, b.y);
+          ctx.lineTo(b.x - shoulderB - 40, b.y);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = '#2f3338';
+          ctx.beginPath();
+          ctx.moveTo(a.x - a.roadWidth * 0.5, a.y);
+          ctx.lineTo(a.x + a.roadWidth * 0.5, a.y);
+          ctx.lineTo(b.x + b.roadWidth * 0.5, b.y);
+          ctx.lineTo(b.x - b.roadWidth * 0.5, b.y);
+          ctx.closePath();
+          ctx.fill();
+
+          const laneW1 = a.roadWidth * 0.03;
+          const laneW2 = b.roadWidth * 0.03;
+          ctx.fillStyle = '#f5ed8d';
+          ctx.beginPath();
+          ctx.moveTo(a.x - laneW1, a.y);
+          ctx.lineTo(a.x + laneW1, a.y);
+          ctx.lineTo(b.x + laneW2, b.y);
+          ctx.lineTo(b.x - laneW2, b.y);
+          ctx.closePath();
+          ctx.fill();
+
+          const curbW1 = a.roadWidth * 0.52;
+          const curbW2 = b.roadWidth * 0.52;
+          ctx.fillStyle = '#bdbdbd';
+          ctx.beginPath();
+          ctx.moveTo(a.x - curbW1, a.y);
+          ctx.lineTo(a.x - a.roadWidth * 0.5, a.y);
+          ctx.lineTo(b.x - b.roadWidth * 0.5, b.y);
+          ctx.lineTo(b.x - curbW2, b.y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(a.x + a.roadWidth * 0.5, a.y);
+          ctx.lineTo(a.x + curbW1, a.y);
+          ctx.lineTo(b.x + curbW2, b.y);
+          ctx.lineTo(b.x + b.roadWidth * 0.5, b.y);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        for (let z = 24; z < 210; z += 12) {
+          const p = project(roadCenterShiftAt(z), z);
+          if (!p) continue;
+          const bHeight = Math.max(18, p.scale * 180);
+          const bWidth = Math.max(12, p.scale * 80);
+          const color = BUILDING_COLORS[Math.floor(z / 12) % BUILDING_COLORS.length];
+          const leftX = p.x - p.roadWidth * 0.82 - bWidth;
+          const rightX = p.x + p.roadWidth * 0.82;
+          drawBuilding(leftX, p.y, bWidth, bHeight, color);
+          drawBuilding(rightX, p.y, bWidth, bHeight, color);
+        }
+      }
+
+      function drawBuilding(x, groundY, width, height, color) {
+        const side = shadeColor(color, -18);
+        const roof = shadeColor(color, 16);
+        ctx.fillStyle = color;
+        ctx.fillRect(x, groundY - height, width, height);
+        ctx.fillStyle = side;
+        ctx.beginPath();
+        ctx.moveTo(x + width, groundY - height);
+        ctx.lineTo(x + width + width * 0.22, groundY - height - height * 0.08);
+        ctx.lineTo(x + width + width * 0.22, groundY - height * 0.08);
+        ctx.lineTo(x + width, groundY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = roof;
+        ctx.beginPath();
+        ctx.moveTo(x, groundY - height);
+        ctx.lineTo(x + width, groundY - height);
+        ctx.lineTo(x + width + width * 0.22, groundY - height - height * 0.08);
+        ctx.lineTo(x + width * 0.22, groundY - height - height * 0.08);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 250, 190, 0.65)';
+        const cols = Math.max(2, Math.floor(width / 12));
+        const rows = Math.max(2, Math.floor(height / 18));
+        for (let cx = 0; cx < cols; cx++) {
+          for (let cy = 0; cy < rows; cy++) {
+            if ((cx + cy) % 3 === 0) continue;
+            ctx.fillRect(x + 4 + cx * (width - 8) / cols, groundY - height + 6 + cy * (height - 14) / rows, Math.max(2, width * 0.1), Math.max(3, height * 0.06));
+          }
+        }
+      }
+
+      function drawTrafficElements() {
+        let upcoming = null;
+
+        for (const light of trafficLights) {
+          const rel = light.z - state.distance;
+          if (rel < -10) {
+            light.z += LIGHT_GAP * trafficLights.length;
+            light.penalizedAtPass = false;
+          }
+
+          const roadOffset = roadCenterShiftAt(light.z) + light.offsetX;
+          const p = project(roadOffset, light.z);
+          if (!p) continue;
+
+          if (!upcoming && rel > 0) upcoming = light;
+
+          const crossHalf = p.roadWidth * 0.7;
+          const stripeCount = 6;
+          const stripeHeight = Math.max(2, p.scale * 12);
+          for (let i = 0; i < stripeCount; i++) {
+            const start = -crossHalf + i * (crossHalf * 2 / stripeCount);
+            const end = start + crossHalf * 2 / (stripeCount * 1.6);
+            ctx.fillStyle = '#f8f8f8';
+            ctx.beginPath();
+            ctx.moveTo(p.x + start, p.y);
+            ctx.lineTo(p.x + end, p.y);
+            ctx.lineTo(p.x + end * 0.98, p.y + stripeHeight);
+            ctx.lineTo(p.x + start * 0.98, p.y + stripeHeight);
+            ctx.closePath();
+            ctx.fill();
+          }
+
+          ctx.fillStyle = '#3a3a3a';
+          const sideOffset = p.roadWidth * 0.62;
+          const poleH = Math.max(20, p.scale * 90);
+          const poleW = Math.max(3, p.scale * 8);
+          ctx.fillRect(p.x - sideOffset, p.y - poleH, poleW, poleH);
+          ctx.fillRect(p.x + sideOffset - poleW, p.y - poleH, poleW, poleH);
+
+          drawSignalHead(p.x - sideOffset + poleW * 0.5, p.y - poleH, p.scale, light.state);
+          drawSignalHead(p.x + sideOffset - poleW * 0.5, p.y - poleH, p.scale, light.state);
+
+          ctx.fillStyle = '#5a5a5a';
+          ctx.fillRect(p.x - p.roadWidth * 0.56, p.y - stripeHeight * 0.2, p.roadWidth * 1.12, Math.max(2, p.scale * 4));
+
+          if (!light.penalizedAtPass && rel < 0 && rel > -4) {
+            if (light.state === 'red' && Math.abs(state.carX) < 0.42 && state.speed > 0.22) {
+              penalize('Red light! Easy, tiger.');
+              light.penalizedAtPass = true;
+            } else if (light.state === 'yellow' && state.speed > 1.2) {
+              setMessage('Careful at yellow.', 'warn');
+              light.penalizedAtPass = true;
+            }
+          }
+        }
+
+        if (upcoming) {
+          lightAheadEl.textContent = upcoming.state.toUpperCase();
+          lightAheadEl.style.color = upcoming.state === 'green' ? '#7df6a4' : upcoming.state === 'yellow' ? '#ffe27a' : '#ff8888';
+          const dist = upcoming.z - state.distance;
+          if (upcoming.state === 'red' && dist < 28) setMessage('Red light ahead. Brake before the crosswalk.', 'bad');
+          else if (upcoming.state === 'yellow' && dist < 24) setMessage('Yellow ahead. Slow down.', 'warn');
+          else if (upcoming.state === 'green' && dist < 24) setMessage('Green. Keep it smooth.', 'good');
+        } else {
+          lightAheadEl.textContent = '—';
+          lightAheadEl.style.color = '';
+        }
+      }
+
+      function drawSignalHead(x, y, scale, stateName) {
+        const headW = Math.max(10, scale * 26);
+        const headH = Math.max(18, scale * 56);
+        const radius = Math.max(2.5, scale * 7);
+        ctx.fillStyle = '#1d232d';
+        roundRect(ctx, x - headW * 0.5, y - headH, headW, headH, Math.max(3, scale * 6));
+        ctx.fill();
+        const colors = ['red', 'yellow', 'green'];
+        colors.forEach((c, i) => {
+          ctx.beginPath();
+          ctx.arc(x, y - headH + radius * 1.8 + i * radius * 2.3, radius, 0, Math.PI * 2);
+          const active = c === stateName;
+          ctx.fillStyle = active ? c : 'rgba(255,255,255,0.12)';
+          ctx.fill();
+          if (active) {
+            ctx.shadowBlur = radius * 2.6;
+            ctx.shadowColor = c;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          }
+        });
+      }
+
+      function drawPlayerCar() {
+        const y = h * 0.82;
+        const x = w * 0.5 + state.carX * roadBottomWidth * 0.22;
+        const bodyW = Math.min(80, roadBottomWidth * 0.14);
+        const bodyH = bodyW * 1.45;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(state.steer * 0.18);
+
+        ctx.fillStyle = '#1a1a20';
+        ctx.beginPath();
+        ctx.ellipse(-bodyW * 0.32, bodyH * 0.28, bodyW * 0.17, bodyW * 0.22, 0, 0, Math.PI * 2);
+        ctx.ellipse(bodyW * 0.32, bodyH * 0.28, bodyW * 0.17, bodyW * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const gradient = ctx.createLinearGradient(0, -bodyH * 0.6, 0, bodyH * 0.5);
+        gradient.addColorStop(0, '#76dbff');
+        gradient.addColorStop(0.5, '#1f7dff');
+        gradient.addColorStop(1, '#0d3f97');
+        ctx.fillStyle = gradient;
+        roundRect(ctx, -bodyW * 0.5, -bodyH * 0.48, bodyW, bodyH * 0.96, bodyW * 0.22);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(220, 244, 255, 0.92)';
+        roundRect(ctx, -bodyW * 0.28, -bodyH * 0.34, bodyW * 0.56, bodyH * 0.26, bodyW * 0.12);
+        ctx.fill();
+
+        ctx.fillStyle = '#d72e39';
+        ctx.fillRect(-bodyW * 0.38, bodyH * 0.28, bodyW * 0.16, bodyH * 0.08);
+        ctx.fillRect(bodyW * 0.22, bodyH * 0.28, bodyW * 0.16, bodyH * 0.08);
+
+        ctx.restore();
+      }
+
+      function update(dt, time) {
+        updateTrafficLights(time);
+
+        const targetThrottle = pedalState.accel ? 1 : 0;
+        const targetBrake = pedalState.brake ? 1 : 0;
+        state.throttle += (targetThrottle - state.throttle) * Math.min(1, dt * 10);
+        state.brake += (targetBrake - state.brake) * Math.min(1, dt * 12);
+
+        const accelForce = 0.85 * state.throttle;
+        const brakeForce = 1.5 * state.brake;
+        const rolling = 0.35 + state.speed * 0.42;
+        state.speed += (accelForce - brakeForce - rolling * 0.36) * dt;
+        state.speed = Math.max(0, Math.min(2.6, state.speed));
+
+        const turnStrength = 0.78 - state.speed * 0.16;
+        state.steer += (joystickState.x - state.steer) * Math.min(1, dt * 7.5);
+        state.carX += state.steer * turnStrength * dt;
+        state.carX *= 0.985;
+        state.carX = Math.max(-0.72, Math.min(0.72, state.carX));
+
+        const laneEdge = 0.55;
+        if (Math.abs(state.carX) > laneEdge) {
+          state.speed = Math.max(0, state.speed - dt * 0.75);
+          setMessage('Stay on the road.', 'warn');
+        }
+
+        state.distance += state.speed * 8.5 * dt;
+
+        if (state.flashTimer > 0) {
+          state.flashTimer -= dt;
+          flashEl.classList.toggle('show', state.flashTimer > 0);
+        } else {
+          flashEl.classList.remove('show');
+        }
+
+        speedEl.textContent = state.speed.toFixed(1);
+        infractionsEl.textContent = String(state.infractions);
+        statusLineEl.textContent = state.message;
+        statusLineEl.className = 'statusLine ' + state.messageClass;
+      }
+
+      function draw() {
+        drawBackground();
+        drawRoadAndCity();
+        drawTrafficElements();
+        drawPlayerCar();
+      }
+
+      function penalize(message) {
+        state.infractions += 1;
+        state.flashTimer = 0.28;
+        setMessage(message, 'bad');
+      }
+
+      function setMessage(message, kind) {
+        state.message = message;
+        state.messageClass = kind;
+      }
+
+      function shadeColor(hex, percent) {
+        const n = hex.replace('#', '');
+        const num = parseInt(n, 16);
+        let r = (num >> 16) + percent;
+        let g = ((num >> 8) & 0x00ff) + percent;
+        let b = (num & 0x0000ff) + percent;
+        r = Math.max(0, Math.min(255, r));
+        g = Math.max(0, Math.min(255, g));
+        b = Math.max(0, Math.min(255, b));
+        return `rgb(${r}, ${g}, ${b})`;
+      }
+
+      function roundRect(ctx, x, y, width, height, radius) {
+        const r = Math.min(radius, width * 0.5, height * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + width, y, x + width, y + height, r);
+        ctx.arcTo(x + width, y + height, x, y + height, r);
+        ctx.arcTo(x, y + height, x, y, r);
+        ctx.arcTo(x, y, x + width, y, r);
+        ctx.closePath();
+      }
+
+      function bindJoystick() {
+        const rectForPoint = () => joystick.getBoundingClientRect();
+
+        function updateFromPoint(clientX, clientY) {
+          const rect = rectForPoint();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const dx = clientX - cx;
+          const dy = clientY - cy;
+          const max = rect.width * 0.28;
+          const len = Math.hypot(dx, dy);
+          const clamp = len > max ? max / len : 1;
+          joystickState.x = (dx * clamp) / max;
+          joystickState.y = (dy * clamp) / max;
+          joystickKnob.style.transform = `translate(${joystickState.x * max}px, ${joystickState.y * max}px)`;
+        }
+
+        joystick.addEventListener('pointerdown', (e) => {
+          joystickState.active = true;
+          joystickState.pointerId = e.pointerId;
+          joystick.setPointerCapture(e.pointerId);
+          updateFromPoint(e.clientX, e.clientY);
+        });
+
+        joystick.addEventListener('pointermove', (e) => {
+          if (!joystickState.active || joystickState.pointerId !== e.pointerId) return;
+          updateFromPoint(e.clientX, e.clientY);
+        });
+
+        function resetJoystick(e) {
+          if (joystickState.pointerId !== e.pointerId) return;
+          joystickState.active = false;
+          joystickState.pointerId = null;
+          joystickState.x = 0;
+          joystickState.y = 0;
+          joystickKnob.style.transform = 'translate(0px, 0px)';
+        }
+
+        joystick.addEventListener('pointerup', resetJoystick);
+        joystick.addEventListener('pointercancel', resetJoystick);
+      }
+
+      function bindPedal(button, key) {
+        const set = (value) => {
+          pedalState[key] = value;
+          button.classList.toggle('active', value);
+        };
+        button.addEventListener('pointerdown', (e) => { e.preventDefault(); set(true); });
+        button.addEventListener('pointerup', () => set(false));
+        button.addEventListener('pointercancel', () => set(false));
+        button.addEventListener('pointerleave', () => set(false));
+      }
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'w') { pedalState.accel = true; accelBtn.classList.add('active'); }
+        if (e.key === 'ArrowDown' || e.key === 's') { pedalState.brake = true; brakeBtn.classList.add('active'); }
+        if (e.key === 'ArrowLeft' || e.key === 'a') joystickState.x = -1;
+        if (e.key === 'ArrowRight' || e.key === 'd') joystickState.x = 1;
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'w') { pedalState.accel = false; accelBtn.classList.remove('active'); }
+        if (e.key === 'ArrowDown' || e.key === 's') { pedalState.brake = false; brakeBtn.classList.remove('active'); }
+        if ([ 'ArrowLeft', 'ArrowRight', 'a', 'd' ].includes(e.key)) joystickState.x = 0;
+      });
+
+      bindJoystick();
+      bindPedal(accelBtn, 'accel');
+      bindPedal(brakeBtn, 'brake');
+      ensureLights();
+      resize();
+      window.addEventListener('resize', resize);
+
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        update(dt, now);
+        draw();
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
