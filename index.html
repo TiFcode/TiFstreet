@@ -402,6 +402,7 @@
           ctx.fill();
         }
 
+        const buildings = [];
         for (let relZ = 24; relZ < viewDepth; relZ += 12) {
           const worldZ = state.distance + relZ;
           const p = project(roadCenterShiftAt(worldZ), worldZ);
@@ -409,10 +410,20 @@
           const bHeight = Math.max(18, p.scale * 180);
           const bWidth = Math.max(12, p.scale * 80);
           const color = BUILDING_COLORS[Math.floor(relZ / 12) % BUILDING_COLORS.length];
-          const leftX = p.x - p.roadWidth * 0.82 - bWidth;
-          const rightX = p.x + p.roadWidth * 0.82;
-          drawBuilding(leftX, p.y, bWidth, bHeight, color);
-          drawBuilding(rightX, p.y, bWidth, bHeight, color);
+          buildings.push({
+            y: p.y,
+            leftX: p.x - p.roadWidth * 0.82 - bWidth,
+            rightX: p.x + p.roadWidth * 0.82,
+            width: bWidth,
+            height: bHeight,
+            color,
+          });
+        }
+
+        buildings.sort((a, b) => a.y - b.y);
+        for (const b of buildings) {
+          drawBuilding(b.leftX, b.y, b.width, b.height, b.color);
+          drawBuilding(b.rightX, b.y, b.width, b.height, b.color);
         }
       }
 
