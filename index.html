@@ -339,10 +339,12 @@
 
       function drawRoadAndCity() {
         const step = 4;
+        const viewDepth = 210;
         const segments = [];
-        for (let z = 4; z <= 210; z += step) {
-          const p = project(roadCenterShiftAt(z), z);
-          if (p) segments.push({ z, ...p });
+        for (let relZ = 4; relZ <= viewDepth; relZ += step) {
+          const worldZ = state.distance + relZ;
+          const p = project(roadCenterShiftAt(worldZ), worldZ);
+          if (p) segments.push({ z: worldZ, ...p });
         }
         if (segments.length < 2) return;
 
@@ -400,12 +402,13 @@
           ctx.fill();
         }
 
-        for (let z = 24; z < 210; z += 12) {
-          const p = project(roadCenterShiftAt(z), z);
+        for (let relZ = 24; relZ < viewDepth; relZ += 12) {
+          const worldZ = state.distance + relZ;
+          const p = project(roadCenterShiftAt(worldZ), worldZ);
           if (!p) continue;
           const bHeight = Math.max(18, p.scale * 180);
           const bWidth = Math.max(12, p.scale * 80);
-          const color = BUILDING_COLORS[Math.floor(z / 12) % BUILDING_COLORS.length];
+          const color = BUILDING_COLORS[Math.floor(relZ / 12) % BUILDING_COLORS.length];
           const leftX = p.x - p.roadWidth * 0.82 - bWidth;
           const rightX = p.x + p.roadWidth * 0.82;
           drawBuilding(leftX, p.y, bWidth, bHeight, color);
