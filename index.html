@@ -253,7 +253,7 @@
       };
 
       const trafficLights = [];
-      const LIGHT_GAP = 90;
+      const LIGHT_GAP = 140;
       const BUILDING_COLORS = ['#cf6a59', '#e7b95e', '#7bb6e8', '#8dcf88', '#9d86d7', '#f2a3d3'];
       const joystickState = { active: false, x: 0, y: 0, pointerId: null };
       const pedalState = { accel: false, brake: false };
@@ -297,7 +297,7 @@
       function project(worldX, worldZ) {
         const relativeZ = worldZ - state.distance;
         if (relativeZ <= 2) return null;
-        const perspective = Math.max(0, Math.min(1, 1 - relativeZ / 220));
+        const perspective = Math.max(0, Math.min(1, 1 - relativeZ / 320));
         const roadCenter = w * 0.5 + state.carX * -70 * perspective;
         const screenY = horizonY + (h - horizonY) * perspective;
         const roadWidth = roadTopWidth + (roadBottomWidth - roadTopWidth) * perspective;
@@ -339,7 +339,7 @@
 
       function drawRoadAndCity() {
         const step = 4;
-        const viewDepth = 210;
+        const viewDepth = 320;
         const segments = [];
         for (let relZ = 4; relZ <= viewDepth; relZ += step) {
           const worldZ = state.distance + relZ;
@@ -459,7 +459,7 @@
             light.penalizedAtPass = false;
           }
 
-          if (rel > 120) {
+          if (rel > 220) {
             if (!upcoming) upcoming = light;
             continue;
           }
@@ -490,9 +490,9 @@
           ctx.fillRect(p.x - p.roadWidth * 0.52, p.y - stripeHeight * 0.2, p.roadWidth * 1.04, Math.max(2, p.scale * 3));
 
           const sideOffset = p.roadWidth * 0.68;
-          const poleH = Math.min(120, Math.max(18, p.scale * 54));
-          const poleW = Math.min(7, Math.max(2, p.scale * 4));
-          const headScale = Math.min(0.9, Math.max(0.24, p.scale * 0.72));
+          const poleH = Math.min(120, Math.max(10, p.scale * 42));
+          const poleW = Math.min(7, Math.max(1.5, p.scale * 3));
+          const headScale = Math.min(0.82, Math.max(0.12, p.scale * 0.5));
 
           ctx.fillStyle = '#3a3a3a';
           ctx.fillRect(p.x - sideOffset, p.y - poleH, poleW, poleH);
